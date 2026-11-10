@@ -1,0 +1,258 @@
+/* Next Toppers Study Kit — page-level host + native controls. */
+#nt-study-kit-host {
+  all: initial;
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  pointer-events: none;
+  font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+#nt-study-kit-host.nt-disabled {
+  display: none !important;
+}
+
+html.nt-sheet-open,
+html.nt-sheet-open body {
+  overflow: hidden !important;
+}
+
+/* ---------------------------------------------------------- header button */
+
+.nt-head-btn {
+  all: initial !important;
+  box-sizing: border-box !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  height: 40px !important;
+  margin: 0 0 0 10px !important;
+  padding: 0 13px 0 8px !important;
+  border: 1px solid #d9eee7 !important;
+  border-radius: 999px !important;
+  background: linear-gradient(180deg, #f7fdfa 0%, #eefaf5 100%) !important;
+  color: #0a6b50 !important;
+  font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  letter-spacing: -0.1px !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+  vertical-align: middle !important;
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease,
+    transform 160ms ease !important;
+}
+.nt-head-btn:hover {
+  background: linear-gradient(180deg, #f0fcf7 0%, #ddf7ee 100%) !important;
+  border-color: #a9e6d4 !important;
+  box-shadow: 0 5px 16px rgba(16, 138, 99, 0.13) !important;
+  transform: translateY(-1px) !important;
+}
+.nt-head-btn:active {
+  transform: translateY(0) !important;
+}
+.nt-head-btn:focus-visible {
+  outline: 2px solid #30cfaa !important;
+  outline-offset: 2px !important;
+}
+.nt-head-btn .nt-head-mark {
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+}
+.nt-head-btn .nt-head-mark svg {
+  display: block !important;
+  border-radius: 6px !important;
+}
+.nt-head-btn .nt-head-label {
+  display: inline-block !important;
+  color: inherit !important;
+}
+.nt-head-btn kbd {
+  all: initial !important;
+  display: inline-block !important;
+  box-sizing: border-box !important;
+  padding: 2px 5px !important;
+  border: 1px solid #d5eae3 !important;
+  border-radius: 4px !important;
+  background: #ffffff !important;
+  color: #6d837b !important;
+  font-family: "Poppins", sans-serif !important;
+  font-size: 9px !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+  letter-spacing: 0.2px !important;
+}
+.nt-head-btn.is-on-dark {
+  border-color: rgba(125, 235, 201, 0.28) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #e4fff7 !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.nt-head-btn.is-on-dark:hover {
+  border-color: rgba(125, 235, 201, 0.5) !important;
+  background: rgba(48, 207, 170, 0.16) !important;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.18) !important;
+}
+.nt-head-btn.is-on-dark kbd {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  background: rgba(0, 0, 0, 0.18) !important;
+  color: #b6d6cb !important;
+}
+
+@media (max-width: 1180px) {
+  .nt-head-btn kbd {
+    display: none !important;
+  }
+}
+@media (max-width: 720px) {
+  .nt-head-btn {
+    height: 34px !important;
+    padding: 0 7px !important;
+    margin-left: 6px !important;
+  }
+  .nt-head-btn .nt-head-label {
+    display: none !important;
+  }
+}
+
+/* ------------------------------------------------------------ video.js bits */
+
+.nt-vjs-group {
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+  order: 8 !important;
+  margin: 0 2px !important;
+}
+.nt-vjs-btn {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 3.5em !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: #ffffff !important;
+  opacity: 0.88 !important;
+  cursor: pointer !important;
+  font-family: "Poppins", sans-serif !important;
+  transition: background 140ms ease, opacity 140ms ease, color 140ms ease !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+.nt-vjs-btn:hover {
+  background: rgba(255, 255, 255, 0.14) !important;
+  opacity: 1 !important;
+}
+.nt-vjs-btn:focus-visible {
+  outline: 2px solid #42e3b9 !important;
+  outline-offset: -3px !important;
+}
+.nt-vjs-btn.is-active {
+  color: #42e3b9 !important;
+}
+.nt-vjs-btn.has-bookmarks::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 24% !important;
+  right: 23% !important;
+  width: 5px !important;
+  height: 5px !important;
+  border-radius: 50% !important;
+  background: #42e3b9 !important;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.28) !important;
+}
+.nt-vjs-btn svg {
+  display: block !important;
+  width: 21px !important;
+  height: 21px !important;
+  fill: none !important;
+}
+.nt-vjs-btn svg text {
+  fill: currentColor !important;
+  stroke: none !important;
+}
+.nt-vjs-mark {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 5px !important;
+  overflow: hidden !important;
+}
+.nt-vjs-mark svg {
+  display: block !important;
+  width: 19px !important;
+  height: 19px !important;
+}
+.nt-vjs-tip {
+  position: absolute !important;
+  left: 50% !important;
+  bottom: calc(100% + 9px) !important;
+  transform: translate(-50%, 4px) !important;
+  padding: 5px 8px !important;
+  border-radius: 6px !important;
+  background: rgba(8, 27, 22, 0.94) !important;
+  color: #f2fffa !important;
+  font-family: "Poppins", sans-serif !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  line-height: 1.3 !important;
+  white-space: nowrap !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 140ms ease, transform 140ms ease !important;
+  z-index: 20 !important;
+}
+.nt-vjs-btn:hover .nt-vjs-tip,
+.nt-vjs-btn:focus-visible .nt-vjs-tip {
+  opacity: 1 !important;
+  transform: translate(-50%, 0) !important;
+}
+html.nt-hide-player-buttons .nt-vjs-group {
+  display: none !important;
+}
+
+/* --------------------------------------------------------- timeline markers */
+
+.nt-progress-markers {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 4 !important;
+  pointer-events: none !important;
+}
+.nt-progress-dot {
+  position: absolute !important;
+  top: 50% !important;
+  width: 9px !important;
+  height: 9px !important;
+  padding: 0 !important;
+  border: 1.5px solid rgba(4, 27, 21, 0.7) !important;
+  border-radius: 50% !important;
+  background: #ffd166 !important;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4) !important;
+  transform: translate(-50%, -50%) scale(1) !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  transition: transform 120ms ease, background 120ms ease !important;
+}
+.nt-progress-dot:hover {
+  background: #ffe29a !important;
+  transform: translate(-50%, -50%) scale(1.35) !important;
+}
+
+@media (max-width: 640px) {
+  .nt-vjs-btn {
+    width: 2.7em !important;
+  }
+  .nt-vjs-btn:nth-child(1),
+  .nt-vjs-btn:nth-child(2) {
+    display: none !important;
+  }
+  .nt-vjs-tip {
+    display: none !important;
+  }
+}

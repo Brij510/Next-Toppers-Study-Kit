@@ -1,0 +1,87 @@
+{
+  "manifest_version": 3,
+  "name": "Next Toppers Study Kit",
+  "short_name": "NT Study Kit",
+  "version": "1.1.1",
+  "description": "A native study layer for nexttoppers.com — continue lectures, search your course, save timestamps, and track progress without leaving the site.",
+  "minimum_chrome_version": "111",
+  "icons": {
+    "16": "assets/icon16.png",
+    "32": "assets/icon32.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
+  },
+  "permissions": ["storage", "scripting"],
+  "host_permissions": [
+    "https://nexttoppers.com/*",
+    "https://*.nexttoppers.com/*"
+  ],
+  "action": {
+    "default_title": "Next Toppers Study Kit",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "32": "assets/icon32.png",
+      "48": "assets/icon48.png",
+      "128": "assets/icon128.png"
+    }
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://nexttoppers.com/*",
+        "https://*.nexttoppers.com/*"
+      ],
+      "js": ["src/page-bridge.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://nexttoppers.com/*",
+        "https://*.nexttoppers.com/*"
+      ],
+      "js": [
+        "src/shared.js",
+        "src/store.js",
+        "src/api.js",
+        "src/sync.js",
+        "src/ui-core.js",
+        "src/native.js",
+        "src/content.js"
+      ],
+      "css": ["src/host.css", "src/native.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/ui.css", "src/player.css"],
+      "matches": [
+        "https://nexttoppers.com/*",
+        "https://*.nexttoppers.com/*"
+      ]
+    }
+  ],
+  "commands": {
+    "open-study-hub": {
+      "suggested_key": {
+        "default": "Alt+Shift+S"
+      },
+      "description": "Open the Study Kit drawer"
+    },
+    "quick-search": {
+      "suggested_key": {
+        "default": "Alt+Shift+F"
+      },
+      "description": "Search lectures and bookmarks"
+    }
+  }
+}

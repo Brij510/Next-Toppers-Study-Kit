@@ -1,0 +1,647 @@
+/* Next Toppers Study Kit — native light-DOM sections.
+ *
+ * These styles intentionally mirror the site: Poppins, white cards, #02c190
+ * mint accents and Tailwind-like radii. Every selector is namespaced so the
+ * page's own styles cannot leak in and ours cannot leak out. */
+
+[data-nt-native] {
+  box-sizing: border-box;
+  font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #1f2937;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+  -webkit-font-smoothing: antialiased;
+}
+[data-nt-native] *,
+[data-nt-native] *::before,
+[data-nt-native] *::after {
+  box-sizing: border-box;
+}
+[data-nt-native] button {
+  margin: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: normal;
+}
+[data-nt-native] button:focus-visible {
+  outline: 2px solid #02c190;
+  outline-offset: 2px;
+}
+[data-nt-native] svg {
+  display: block;
+  flex: 0 0 auto;
+}
+[data-nt-native] .nt-native-mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  overflow: hidden;
+}
+[data-nt-native] .nt-native-mark svg {
+  display: block;
+}
+[data-nt-native] .nt-native-mark-sm {
+  border-radius: 6px;
+}
+
+/* ----------------------------------------------------------- shared pieces */
+
+[data-nt-native] .nt-native-eyebrow {
+  display: block;
+  color: #019b76;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+[data-nt-native] .nt-native-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 3px 8px;
+  border: 1px solid #d9efe7;
+  border-radius: 999px;
+  background: #f2fcf8;
+  color: #08795a;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+[data-nt-native] .nt-native-chip.is-done {
+  border-color: #b9ebd9;
+  background: #e7fbf3;
+  color: #00805e;
+}
+[data-nt-native] .nt-native-chip-soft {
+  border-color: #e7eeeb;
+  background: #f8faf9;
+  color: #7c8b85;
+  font-weight: 500;
+}
+[data-nt-native] .nt-native-track {
+  position: relative;
+  width: 100%;
+  max-width: 430px;
+  height: 6px;
+  margin-top: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8f2ee;
+}
+[data-nt-native] .nt-native-track > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #02c190 0%, #35d9ab 100%);
+  transition: width 260ms ease;
+}
+[data-nt-native] .nt-native-track-sm {
+  max-width: none;
+  height: 5px;
+  margin-top: 8px;
+}
+[data-nt-native] .nt-native-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: #84948d;
+  font-size: 10.5px;
+  line-height: 1.4;
+  text-align: right;
+}
+[data-nt-native] .nt-native-spinner {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 11px;
+  height: 11px;
+  border: 2px solid #cceee3;
+  border-top-color: #02c190;
+  border-radius: 50%;
+  animation: nt-native-spin 720ms linear infinite;
+}
+@keyframes nt-native-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-nt-native] .nt-native-spinner {
+    animation-duration: 2.4s;
+  }
+  [data-nt-native] .nt-native-track > i {
+    transition: none;
+  }
+}
+
+[data-nt-native] .nt-native-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease,
+    box-shadow 150ms ease;
+}
+[data-nt-native] .nt-native-btn-primary {
+  background: #02c190;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(2, 193, 144, 0.2);
+}
+[data-nt-native] .nt-native-btn-primary:hover {
+  background: #00ab7f;
+  box-shadow: 0 6px 16px rgba(2, 193, 144, 0.26);
+}
+[data-nt-native] .nt-native-btn-ghost {
+  border-color: #dbe9e3;
+  background: #ffffff;
+  color: #3f5650;
+}
+[data-nt-native] .nt-native-btn-ghost:hover {
+  border-color: #b3dfd1;
+  background: #f8fffc;
+  color: #00805e;
+}
+[data-nt-native] .nt-native-btn-ghost.is-on {
+  border-color: #b9ebd9;
+  background: #e9fbf4;
+  color: #00805e;
+}
+[data-nt-native] .nt-native-btn[disabled] {
+  cursor: default;
+  opacity: 0.62;
+  box-shadow: none;
+}
+[data-nt-native] .nt-native-textbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 0;
+  color: #008568;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+[data-nt-native] .nt-native-textbtn:hover {
+  color: #006d55;
+  text-decoration: underline;
+}
+[data-nt-native] .nt-native-link {
+  padding: 0;
+  color: #008f70;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-decoration: none;
+}
+[data-nt-native] .nt-native-link:hover {
+  color: #006f57;
+  text-decoration: underline;
+}
+
+/* ------------------------------------------------------------- home section */
+
+.nt-native-home {
+  width: min(calc(100% - 32px), 1180px);
+  margin: 22px auto 10px;
+  padding: 18px 20px 15px;
+  border: 1px solid #e0efe8;
+  border-radius: 16px;
+  background: linear-gradient(115deg, #ffffff 0%, #f7fdfa 55%, #effbf5 100%);
+  box-shadow: 0 5px 22px rgba(6, 84, 61, 0.06);
+}
+.nt-native-home-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+.nt-native-brandline {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+.nt-native-brandline > div {
+  min-width: 0;
+}
+.nt-native-home-heading {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: #14261f;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nt-native-home-body {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 13px;
+  padding-top: 13px;
+  border-top: 1px solid #e9f3ee;
+}
+.nt-native-home-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.nt-native-now {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.nt-native-now strong {
+  overflow: hidden;
+  color: #1b3028;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nt-native-now-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #02c190;
+  box-shadow: 0 0 0 3px rgba(2, 193, 144, 0.14);
+}
+.nt-native-home-sub {
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: #6b8078;
+  font-size: 11px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nt-native-home-copy {
+  margin: 0;
+  max-width: 680px;
+  color: #4d625b;
+  font-size: 11.5px;
+  line-height: 1.65;
+}
+.nt-native-home-meta {
+  margin: 7px 0 0;
+  color: #758781;
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+.nt-native-home-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+.nt-native-home-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 13px;
+  padding-top: 11px;
+  border-top: 1px dashed #e5f0eb;
+}
+.nt-native-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------ private rail */
+
+.nt-native-side-item {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nt-native-side-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: left;
+  transition: background 140ms ease, color 140ms ease;
+}
+.nt-native-side-btn:hover {
+  background: #eefaf5;
+  color: #00936e;
+}
+.nt-native-side-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  color: #02c190;
+}
+.nt-native-side-icon svg {
+  width: 12px;
+  height: 12px;
+}
+.nt-native-side-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nt-native-side-badge {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #e8fbf4;
+  color: #008565;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/* -------------------------------------------------------------- course bar */
+
+.nt-native-course {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 14px 16px 0;
+  padding: 14px 16px;
+  border: 1px solid #e0efe8;
+  border-radius: 14px;
+  background: linear-gradient(110deg, #ffffff 0%, #f6fdf9 60%, #eefbf5 100%);
+  box-shadow: 0 4px 16px rgba(6, 84, 61, 0.05);
+}
+.nt-native-course-lead {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  min-width: 0;
+}
+.nt-native-course-copy {
+  min-width: 0;
+}
+.nt-native-course-title {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: #172b23;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nt-native-course-sub {
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: #6b8078;
+  font-size: 11px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nt-native-course .nt-native-track {
+  max-width: none;
+}
+.nt-native-course-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+.nt-native-course .nt-native-status {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+/* ------------------------------------------------------------- player card */
+
+.nt-native-player {
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid #e1eee8;
+  border-radius: 12px;
+  background: #fbfffd;
+}
+.nt-native-player-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.nt-native-player-brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: #0c2f25;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.nt-native-player-title {
+  margin-top: 8px;
+  overflow: hidden;
+  color: #1a2e26;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.nt-native-player-meta {
+  margin-top: 2px;
+  overflow: hidden;
+  color: #83958e;
+  font-size: 10px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nt-native-player-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+.nt-native-player-actions .nt-native-btn {
+  width: 100%;
+  min-height: 30px;
+  height: 30px;
+  padding: 0 6px;
+  font-size: 10.5px;
+}
+.nt-native-player-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 11px;
+  color: #8a9a94;
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.nt-native-bm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 5px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.nt-native-bm-list li {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nt-native-bm {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 4px 5px;
+  border-radius: 6px;
+  color: #355049;
+  font-size: 10.5px;
+  line-height: 1.4;
+  text-align: left;
+  transition: background 130ms ease, color 130ms ease;
+}
+.nt-native-bm:hover {
+  background: #eefaf5;
+  color: #007d5f;
+}
+.nt-native-bm-time {
+  flex: 0 0 auto;
+  color: #00916f;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.nt-native-bm-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nt-native-player-empty {
+  margin: 9px 0 0;
+  color: #8a9a94;
+  font-size: 10px;
+  line-height: 1.6;
+}
+.nt-native-player-empty kbd {
+  padding: 1px 4px;
+  border: 1px solid #dce9e4;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #5d716a;
+  font-family: inherit;
+  font-size: 9px;
+}
+.nt-native-player-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #edf5f1;
+}
+
+/* ---------------------------------------------------------------- responsive */
+
+@media (max-width: 900px) {
+  .nt-native-home {
+    width: calc(100% - 24px);
+    margin-top: 18px;
+  }
+  .nt-native-home-body {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 11px;
+  }
+  .nt-native-home-actions {
+    justify-content: flex-start;
+  }
+  .nt-native-course {
+    margin: 12px 12px 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .nt-native-home {
+    width: calc(100% - 20px);
+    padding: 14px 14px 12px;
+    border-radius: 13px;
+  }
+  .nt-native-home-head {
+    align-items: center;
+  }
+  .nt-native-home-heading {
+    font-size: 14px;
+    white-space: normal;
+  }
+  .nt-native-home-head .nt-native-textbtn {
+    display: none;
+  }
+  .nt-native-home-actions .nt-native-btn {
+    flex: 1 1 auto;
+  }
+  .nt-native-home-foot {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .nt-native-course {
+    margin: 10px 10px 0;
+    padding: 12px;
+  }
+  .nt-native-course-title {
+    white-space: normal;
+  }
+  .nt-native-course-actions .nt-native-btn {
+    flex: 1 1 auto;
+  }
+  .nt-native-player {
+    padding: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-nt-native] * {
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Next Toppers Study Kit</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup">
+      <header class="top">
+        <div class="brand">
+          <img src="../assets/icon32.png" alt="" class="brand-mark" />
+          <div class="brand-copy">
+            <strong>next<span>toppers</span></strong>
+            <small>STUDY KIT</small>
+          </div>
+        </div>
+        <button class="icon-btn" id="open-settings" type="button" title="Study Kit settings" aria-label="Open settings">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
+          </svg>
+        </button>
+      </header>
+
+      <div class="site-state" id="site-state">
+        <span class="site-dot"></span>
+        <span id="site-text">Checking this tab…</span>
+      </div>
+
+      <button class="continue" id="continue-card" type="button" hidden>
+        <span class="continue-art" id="continue-art">NT</span>
+        <span class="continue-copy">
+          <span class="continue-kicker">Continue where you left off</span>
+          <strong id="continue-title">Your next lecture</strong>
+          <span class="continue-meta" id="continue-meta"></span>
+          <span class="continue-track"><i id="continue-fill"></i></span>
+        </span>
+        <span class="continue-play">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
+            <path d="M8 5.7v12.6c0 .9 1 1.5 1.8 1L19 13c.8-.5.8-1.6 0-2.1L9.8 4.8C9 4.3 8 4.8 8 5.7Z" />
+          </svg>
+        </span>
+      </button>
+
+      <div class="actions">
+        <button class="action primary" id="open-hub" type="button">
+          <span class="action-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m4 10.5 8-6.2 8 6.2V20a1 1 0 0 1-1 1h-4.5v-6.5h-5V21H5a1 1 0 0 1-1-1v-9.5Z" />
+            </svg>
+          </span>
+          <span><strong>Open Study Kit</strong><small>Courses, progress &amp; notes</small></span>
+        </button>
+        <button class="action" id="quick-search" type="button">
+          <span class="action-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="6.4" />
+              <path d="m16 16 4.2 4.2" />
+            </svg>
+          </span>
+          <span><strong>Quick search</strong><small>Jump to any lecture</small></span>
+          <kbd>Ctrl K</kbd>
+        </button>
+        <button class="action" id="open-timestamps" type="button">
+          <span class="action-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6.8 4.5h10.4a1.5 1.5 0 0 1 1.5 1.5v14l-6.7-4.1L5.3 20V6a1.5 1.5 0 0 1 1.5-1.5Z" />
+            </svg>
+          </span>
+          <span><strong>Timestamps</strong><small id="timestamp-count">No moments saved</small></span>
+        </button>
+      </div>
+
+      <section class="stats" aria-label="Study stats">
+        <div><strong id="stat-done">0</strong><span>done</span></div>
+        <div><strong id="stat-progress">0</strong><span>in progress</span></div>
+        <div><strong id="stat-streak">0</strong><span>day streak</span></div>
+      </section>
+
+      <section class="prefs" aria-label="Quick preferences">
+        <label class="pref">
+          <span><strong>Study Kit</strong><small>Show on nexttoppers.com</small></span>
+          <span class="switch"><input type="checkbox" data-setting="enabled" /><span class="track"><i></i></span></span>
+        </label>
+        <label class="pref">
+          <span><strong>Player shortcuts</strong><small>Seek, pause, bookmark</small></span>
+          <span class="switch"><input type="checkbox" data-setting="shortcuts" /><span class="track"><i></i></span></span>
+        </label>
+        <label class="pref">
+          <span><strong>Page tools</strong><small>Study desk on site pages</small></span>
+          <span class="switch"><input type="checkbox" data-setting="showNativeSections" /><span class="track"><i></i></span></span>
+        </label>
+        <label class="pref">
+          <span><strong>Floating launcher</strong><small>Optional corner button</small></span>
+          <span class="switch"><input type="checkbox" data-setting="showFloatingTab" /><span class="track"><i></i></span></span>
+        </label>
+      </section>
+
+      <footer class="foot">
+        <button class="foot-link" id="open-options" type="button">All settings</button>
+        <span class="foot-brand">Alt ⇧ S for the kit</span>
+      </footer>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
