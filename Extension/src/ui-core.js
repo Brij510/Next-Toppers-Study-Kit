@@ -148,11 +148,13 @@
     document.documentElement.classList.toggle("nt-sheet-open", locked);
   };
 
+  const activeElement = () => shadow?.activeElement || document.activeElement;
+
   const activateLayer = (layer) => {
     if (layer.activated || !layers.includes(layer)) return;
     layer.activated = true;
     layer.node.classList.add("is-open");
-    previousFocus = document.activeElement;
+    previousFocus = activeElement();
     const target =
       layer.node.querySelector("[autofocus]") ||
       layer.node.querySelector("[data-autofocus]") ||
@@ -231,10 +233,18 @@
     if (!focusable.length) return;
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
+    // document.activeElement is the shadow host while focus is inside the
+    // Study Kit, so compare against the layer's own root instead.
+    const root = container.getRootNode();
+    const active = root?.activeElement || document.activeElement;
+    const inside = container.contains(active);
+    if (!inside) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+    } else if (event.shiftKey && (active === first || active === container)) {
       event.preventDefault();
       last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
+    } else if (!event.shiftKey && active === last) {
       event.preventDefault();
       first.focus();
     }

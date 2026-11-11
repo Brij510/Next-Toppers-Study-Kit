@@ -69,6 +69,12 @@ A right-side drawer opened from the **Study Desk** sidebar entry, the course bar
 - Site responses are also observed passively, so lectures you open are indexed even without a full sync.
 
 
+### Progress
+- **Remember my place** saves the playback position locally every ~2 seconds while a lecture plays, and on pause/page hide.
+- **Resume automatically** seeks to that local position on open; **Ask before resuming** shows the resume card instead. A `?nt_t=` timestamp link wins over both.
+- **Auto-complete** marks a lecture done at the configured threshold. A manual “not done” is remembered and will not be re-completed by site data until you mark it done again.
+- The site keeps its own account progress via its heartbeat. The extension reads that completion flag and, only when this device has no local position yet, seeds a local resume point from the site's last-watched value.
+
 ## Keyboard shortcuts
 
 | Key | Action |
@@ -93,8 +99,8 @@ Shortcuts are ignored while typing in an input and while a Study Kit overlay is 
 
 - Everything is stored in `chrome.storage.local` under the `ntdb` key.
 - The extension has **storage** and **scripting** permissions, plus host access to `nexttoppers.com` and its subdomains. Scripting is only used to lazy-inject the drawer, search and player modules when you first open them.
-- Course sync, timestamp mirroring, and watch heartbeat calls use the login cookie you already have on nexttoppers.com. No third-party server is involved.
-- Watch heartbeats are the same kind the site itself uses to remember progress and completion.
+- Course sync and timestamp mirroring use the login cookie you already have on nexttoppers.com. No third-party server is involved.
+- Playback progress is written locally (`position`, percent, completion) as you watch. The extension does not send watch heartbeats; nexttoppers.com sends its own, and the extension observes the responses to mirror completion and (once, conservatively) a site-only last position. Local progress is never overwritten by an older site value.
 - Content details from the site are decrypted in the page using the site's client-side key. If Next Toppers changes that format, course sync may need an update.
 - The demo harness is completely local and uses mocked data; it never contacts the real site.
 
@@ -150,7 +156,7 @@ src/shared.js          Constants, formatting, route parsers, icons
 src/store.js           Local data model, progress, bookmarks, settings
 src/page-bridge.js     MAIN-world bridge to Video.js and site APIs
 src/api.js             Authenticated site API client + content decryption
-src/sync.js            Course, lecture, bookmark, and heartbeat sync
+src/sync.js            Course, lecture, bookmark and completion sync
 src/ui-core.js         Shadow-DOM shell, layers, header button, floating tab
 src/native.js          Native homepage, sidebar, course bar and player card
 src/native.css         Light-DOM styles for the native sections

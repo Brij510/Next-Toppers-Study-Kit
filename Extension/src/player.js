@@ -50,6 +50,7 @@
 
   window.addEventListener("message", (event) => {
     if (event.source !== window) return;
+    if (event.origin && event.origin !== location.origin) return;
     const msg = event.data;
     if (!msg || msg.source !== "nt-page") return;
 
@@ -81,6 +82,16 @@
     }
   });
 
+  const announceCompletion = (duration) => {
+    if (completionAnnounced) return;
+    completionAnnounced = true;
+    const minutes = Math.round(duration / 60);
+    NT.ui.toast(`Lecture complete — ${minutes || "few"} min in the books.`, {
+      type: "done",
+      action: { label: "View progress", onClick: () => openDock("bookmarks") }
+    });
+  };
+
   const applyState = (next) => {
     lastState = state;
     state = next;
@@ -90,6 +101,11 @@
     const contentId = route.contentId;
     const lecture = store.getLecture(contentId);
     const courseId = route.courseId || lecture?.courseId || "";
+
+    // Persist the exact pause point instead of waiting for the next 2.2s tick.
+    // Only a real playing→paused transition counts: the initial placeholder
+    // state (or a missing state) must not overwrite a saved position with 0:00.
+    if (next.paused && lastState?.paused === false) flushWatch();
 
     if (lecture?.title) {
       const progress = store.getProgress(contentId);
@@ -110,8 +126,10 @@
     const protectingSavedPosition =
       position < 1 && existing && existing.position > 15 && !existing.completed;
 
-    maybeResume(next);
-    maybeDeepLink(next);
+    // A timestamp deep link is more specific than a saved resume point, so it
+    // must get the first chance to move the playhead.
+    const deepSeeked = maybeDeepLink(next);
+    if (!deepSeeked) maybeResume(next);
 
     if (
       !protectingSavedPosition &&
@@ -124,14 +142,19 @@
       store.touchProgress(contentId, position, duration, { silent: true });
       lastProgressSave = now;
       const done = store.isDone(contentId);
-      if (done && !previousDone && !completionAnnounced) {
-        completionAnnounced = true;
-        const minutes = Math.round(duration / 60);
-        NT.ui.toast(`Lecture complete — ${minutes || "few"} min in the books.`, {
-          type: "done",
-          action: { label: "View progress", onClick: () => openDock("shortcuts") }
-        });
-      }
+      if (done && !previousDone) announceCompletion(duration);
+    } else if (
+      // "Remember my place" only controls resume positions. Completion is a
+      // separate setting, so the threshold must still work when position
+      // saving is off.
+      store.settings.autoComplete &&
+      !next.isLive &&
+      duration > 30 &&
+      !store.isDone(contentId) &&
+      (position / duration) * 100 >= (Number(store.settings.autoCompleteAt) || 92)
+    ) {
+      store.markDone(contentId, true, { automatic: true });
+      if (store.isDone(contentId)) announceCompletion(duration);
     }
 
     const moved =
@@ -150,9 +173,11 @@
 
     if ((next.ended || (duration > 0 && position >= duration - 0.5)) && store.settings.autoComplete) {
       if (!store.isDone(contentId)) {
-        store.markDone(contentId, true);
-        completionAnnounced = true;
-        NT.ui.toast("Lecture marked done.", { type: "done" });
+        store.markDone(contentId, true, { automatic: true });
+        if (store.isDone(contentId)) {
+          completionAnnounced = true;
+          NT.ui.toast("Lecture marked done.", { type: "done" });
+        }
       }
     }
   };
@@ -162,7 +187,13 @@
       store.addWatchTime(watchBuffer);
       watchBuffer = 0;
     }
-    if (route && state) {
+    if (
+      route &&
+      state?.ready &&
+      store.settings.saveProgress &&
+      !state.isLive &&
+      Number(state.duration) > 30
+    ) {
       store.touchProgress(route.contentId, state.time, state.duration, { silent: true });
     }
   };
@@ -477,10 +508,29 @@
   /* ---------------------------------------------------------- resume logic */
 
   const maybeDeepLink = (next) => {
-    if (!deepLink || resumeDone || !next.duration) return;
-    resumeDone = true;
-    seek(deepLink.seconds, true);
+    if (!deepLink || resumeDone || !next.duration || next.duration < 5) return false;
+    const link = deepLink;
+    const requested = Number(link.seconds) || 0;
     deepLink = null;
+    if (requested <= 0) return false;
+    const target = Math.min(requested, Math.max(0, next.duration - 1));
+    const routeKey = `${route?.contentId || ""}:${route?.courseId || ""}`;
+    resumeDone = true;
+    resumeChecked = true;
+    seek(target, true).then((value) => {
+      if (value != null) return;
+      // A live stream or a player that was not ready can reject the seek. If
+      // the learner is still on this lecture, retry once on the next player
+      // state, then fall back to the normal local-resume path.
+      if (!active || `${route?.contentId || ""}:${route?.courseId || ""}` !== routeKey) return;
+      if (!link.retried && !deepLink) {
+        link.retried = true;
+        deepLink = link;
+      }
+      resumeDone = false;
+      resumeChecked = false;
+    });
+    return true;
   };
 
   const maybeResume = (next) => {
@@ -1014,6 +1064,14 @@
   };
 
   document.addEventListener("keydown", onKeyDown, true);
+
+  const flushOnHide = () => {
+    if (active) flushWatch();
+  };
+  window.addEventListener("pagehide", flushOnHide);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushOnHide();
+  });
 
   NT.player = {
     init,

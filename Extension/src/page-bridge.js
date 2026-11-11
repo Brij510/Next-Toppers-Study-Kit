@@ -7,6 +7,19 @@
   const IN = "nt-kit";
   const OUT = "nt-page";
   const origin = location.origin;
+  const COMMANDS = new Set([
+    "getState",
+    "play",
+    "pause",
+    "toggle",
+    "seek",
+    "seekBy",
+    "setRate",
+    "setVolume",
+    "mute",
+    "toggleMute",
+    "fullscreen"
+  ]);
   const watched = /\/api\/service-proxy\/course\/(content-details|mycourses|all-content|course-details|add-video-time-bookmark|delete-video-time-bookmark|v1\/watch\/(vod|live)\/heartbeat)/;
   const nativeFetch = window.fetch;
   const xhrOpen = XMLHttpRequest.prototype.open;
@@ -417,11 +430,17 @@
 
   window.addEventListener("message", (event) => {
     if (event.source !== window) return;
+    if (event.origin !== origin) return;
     const msg = event.data;
     if (!msg || msg.source !== IN || msg.kind !== "command") return;
     const id = msg.id;
+    const action = String(msg.action || "");
+    if (!COMMANDS.has(action)) {
+      post("response", { id, ok: false, error: `Unknown player action: ${action}` });
+      return;
+    }
     try {
-      Promise.resolve(command(msg.action, msg.args || {}))
+      Promise.resolve(command(action, msg.args || {}))
         .then((result) => post("response", { id, ok: true, result }))
         .catch((error) => post("response", { id, ok: false, error: String(error?.message || error) }));
     } catch (error) {

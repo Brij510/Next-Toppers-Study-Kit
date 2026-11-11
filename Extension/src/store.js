@@ -26,17 +26,26 @@
 
   const normalizeDb = (raw) => {
     const base = emptyDb();
-    if (!raw || typeof raw !== "object") return base;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return base;
+    // Rebuild from an allow-list instead of spreading arbitrary JSON. This
+    // keeps imports from changing prototypes, injecting unknown settings, or
+    // writing ids such as "__proto__" into the id maps.
+    const clean = NT.sanitize.db(raw);
     return {
-      ...base,
-      ...raw,
-      settings: { ...NT.DEFAULT_SETTINGS, ...(raw.settings || {}) },
-      lectures: raw.lectures && typeof raw.lectures === "object" ? raw.lectures : {},
-      courses: raw.courses && typeof raw.courses === "object" ? raw.courses : {},
-      progress: raw.progress && typeof raw.progress === "object" ? raw.progress : {},
-      bookmarks: Array.isArray(raw.bookmarks) ? raw.bookmarks : [],
-      activity: raw.activity && typeof raw.activity === "object" ? raw.activity : {},
-      meta: { ...base.meta, ...(raw.meta || {}) }
+      _rev: clean._rev || base._rev,
+      _savedAt: clean._savedAt || 0,
+      settings: { ...base.settings, ...clean.settings },
+      lectures: clean.lectures,
+      courses: clean.courses,
+      progress: clean.progress,
+      bookmarks: clean.bookmarks,
+      activity: clean.activity,
+      meta: {
+        ...base.meta,
+        ...clean.meta,
+        schema: SCHEMA,
+        created: clean.meta.created || base.meta.created
+      }
     };
   };
 
@@ -69,7 +78,7 @@
     },
 
     applySettingsDefaults(settings) {
-      return { ...NT.DEFAULT_SETTINGS, ...(settings || {}) };
+      return NT.sanitize.settings(settings);
     },
 
     on(event, handler) {
@@ -168,15 +177,17 @@
 
     upsertCourse(course) {
       if (!course || !course.id) return null;
-      const id = String(course.id);
+      const id = NT.sanitize.id(course.id);
+      if (!id) return null;
       const previous = this.db.courses[id] || {};
-      const next = {
+      const next = NT.sanitize.course({
         ...previous,
         ...course,
         id,
         updatedAt: Date.now(),
         lectureIds: course.lectureIds || previous.lectureIds || []
-      };
+      });
+      if (!next) return null;
       this.db.courses[id] = next;
       this.emitChange("course", next);
       return next;
@@ -184,15 +195,17 @@
 
     upsertLecture(lecture) {
       if (!lecture || !lecture.id) return null;
-      const id = String(lecture.id);
+      const id = NT.sanitize.id(lecture.id);
+      if (!id) return null;
       const previous = this.db.lectures[id] || {};
-      const next = {
+      const next = NT.sanitize.lecture({
         ...previous,
         ...lecture,
         id,
         courseId: String(lecture.courseId || previous.courseId || ""),
         updatedAt: Date.now()
-      };
+      });
+      if (!next) return null;
       this.db.lectures[id] = next;
       this.emitChange("lecture", next);
       return next;
@@ -200,40 +213,48 @@
 
     indexCourse(course, lectures) {
       if (!course || !course.id) return { course: null, lectures: [] };
-      const id = String(course.id);
+      const id = NT.sanitize.id(course.id);
+      if (!id) return { course: null, lectures: [] };
       const lectureIds = [];
       (lectures || []).forEach((lecture) => {
         if (!lecture || !lecture.id) return;
-        const lectureId = String(lecture.id);
-        this.db.lectures[lectureId] = {
+        const lectureId = NT.sanitize.id(lecture.id);
+        if (!lectureId) return;
+        const next = NT.sanitize.lecture({
           ...(this.db.lectures[lectureId] || {}),
           ...lecture,
           id: lectureId,
           courseId: id,
           courseTitle: lecture.courseTitle || course.title || "",
           updatedAt: Date.now()
-        };
+        });
+        if (!next) return;
+        this.db.lectures[lectureId] = next;
         lectureIds.push(lectureId);
       });
       const previous = this.db.courses[id] || {};
-      this.db.courses[id] = {
+      const nextCourse = NT.sanitize.course({
         ...previous,
         ...course,
         id,
         lectureIds: Array.from(new Set(lectureIds)),
         updatedAt: Date.now(),
         syncedAt: course.syncedAt || Date.now()
-      };
-      this.emitChange("index", { course: this.db.courses[id], lectures });
-      return { course: this.db.courses[id], lectures };
+      });
+      if (!nextCourse) return { course: null, lectures: [] };
+      this.db.courses[id] = nextCourse;
+      this.emitChange("index", { course: nextCourse, lectures });
+      return { course: nextCourse, lectures };
     },
 
     getCourse(courseId) {
-      return this.db.courses[String(courseId)] || null;
+      const id = NT.sanitize.id(courseId);
+      return id ? this.db.courses[id] || null : null;
     },
 
     getLecture(contentId) {
-      return this.db.lectures[String(contentId)] || null;
+      const id = NT.sanitize.id(contentId);
+      return id ? this.db.lectures[id] || null : null;
     },
 
     getCourseLectures(courseId) {
@@ -265,12 +286,13 @@
     /* ---------------- progress ---------------- */
 
     getProgress(contentId) {
-      return this.db.progress[String(contentId)] || null;
+      const id = NT.sanitize.id(contentId);
+      return id ? this.db.progress[id] || null : null;
     },
 
     setProgress(contentId, patch, opts = {}) {
-      if (!contentId) return null;
-      const id = String(contentId);
+      const id = NT.sanitize.id(contentId);
+      if (!id) return null;
       const lecture = this.getLecture(id) || {};
       const previous = this.db.progress[id] || {
         contentId: id,
@@ -279,37 +301,61 @@
         percent: 0,
         completed: false,
         manualDone: false,
+        manualUndone: false,
         watchTime: 0,
         createdAt: Date.now()
       };
       const next = {
         ...previous,
-        ...patch,
+        ...(patch || {}),
         contentId: id,
         lectureTitle: lecture.title || previous.lectureTitle || "",
         courseId: lecture.courseId || previous.courseId || "",
         updatedAt: Date.now(),
-        lastWatchedAt: patch.lastWatchedAt || previous.lastWatchedAt || 0
+        lastWatchedAt: patch?.lastWatchedAt || previous.lastWatchedAt || 0
       };
       const duration = Number(next.duration) || 0;
       const position = Math.max(0, Number(next.position) || 0);
+      next.position = position;
+      next.duration = duration;
       if (duration > 0) {
         next.percent = NT.util.clamp((position / duration) * 100, 0, 100);
       } else {
         next.percent = NT.util.clamp(next.percent || 0, 0, 100);
       }
-      if (next.completed || next.manualDone) {
+
+      // A manual "not done" wins over the site's completion flag and over
+      // auto-completion until the learner marks the lecture done again.
+      if (patch?.manualDone === true) {
+        next.completed = true;
+        next.manualDone = true;
+        next.manualUndone = false;
+        next.completedAt = patch.completedAt || Date.now();
+      } else if (patch?.manualUndone === true) {
+        next.completed = false;
+        next.manualDone = false;
+        next.manualUndone = true;
+        next.completedAt = 0;
+      } else if (previous.manualUndone) {
+        next.completed = false;
+        next.manualDone = false;
+        next.manualUndone = true;
+        next.completedAt = 0;
+      } else if (next.completed || next.manualDone) {
         next.completed = true;
       }
-      this.db.progress[id] = next;
+
+      const clean = NT.sanitize.progress(next);
+      if (!clean) return null;
+      this.db.progress[id] = clean;
       this.db.meta.lastLectureId = id;
-      if (opts.silent !== true) this.emitChange("progress", next);
+      if (opts.silent !== true) this.emitChange("progress", clean);
       else this.save();
-      return next;
+      return clean;
     },
 
     touchProgress(contentId, position, duration, opts = {}) {
-      const id = String(contentId);
+      const id = NT.sanitize.id(contentId);
       if (!id) return null;
       const settings = this.db.settings;
       const previous = this.db.progress[id] || {};
@@ -331,12 +377,15 @@
     },
 
     toggleDone(contentId) {
-      const id = String(contentId);
+      const id = NT.sanitize.id(contentId);
+      if (!id) return null;
       const previous = this.db.progress[id] || { position: 0, duration: 0, percent: 0 };
       const done = !(previous.completed || previous.manualDone);
       const next = this.setProgress(id, {
         completed: done,
         manualDone: done,
+        manualUndone: !done,
+        siteCompleted: done ? previous.siteCompleted : false,
         completedAt: done ? Date.now() : 0,
         lastWatchedAt: previous.lastWatchedAt || Date.now()
       });
@@ -344,11 +393,14 @@
       return next;
     },
 
-    markDone(contentId, done = true) {
-      const id = String(contentId);
+    markDone(contentId, done = true, options = {}) {
+      const id = NT.sanitize.id(contentId);
+      if (!id) return null;
+      const automatic = options.automatic === true;
       return this.setProgress(id, {
         completed: Boolean(done),
-        manualDone: Boolean(done),
+        manualDone: automatic ? false : Boolean(done),
+        manualUndone: automatic ? undefined : !done,
         completedAt: done ? Date.now() : 0
       });
     },
@@ -360,7 +412,13 @@
 
     getInProgress(limit = 20) {
       return Object.values(this.db.progress)
-        .filter((item) => item.lastWatchedAt && !item.completed && (item.percent || 0) > 1)
+        .filter(
+          (item) =>
+            item.lastWatchedAt &&
+            !item.completed &&
+            !item.manualUndone &&
+            (item.percent || 0) > 1
+        )
         .sort((a, b) => (b.lastWatchedAt || 0) - (a.lastWatchedAt || 0))
         .slice(0, limit);
     },
@@ -405,28 +463,36 @@
     /* ---------------- bookmarks ---------------- */
 
     getBookmarks(lectureId) {
+      const id = NT.sanitize.id(lectureId);
+      if (lectureId && !id) return [];
       const all = this.db.bookmarks
-        .filter((bookmark) => !lectureId || String(bookmark.lectureId) === String(lectureId))
+        .filter((bookmark) => !lectureId || String(bookmark.lectureId) === id)
         .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       return all;
     },
 
     getLectureBookmarks(lectureId) {
+      const id = NT.sanitize.id(lectureId);
+      if (!id) return [];
       return this.db.bookmarks
-        .filter((bookmark) => String(bookmark.lectureId) === String(lectureId))
+        .filter((bookmark) => String(bookmark.lectureId) === id)
         .sort((a, b) => (Number(a.seconds) || 0) - (Number(b.seconds) || 0));
     },
 
     getBookmark(id) {
-      return this.db.bookmarks.find((bookmark) => bookmark.id === id) || null;
+      const safeId = NT.sanitize.id(id);
+      if (!safeId) return null;
+      return this.db.bookmarks.find((bookmark) => bookmark.id === safeId) || null;
     },
 
     upsertBookmark(bookmark) {
       if (!bookmark) return null;
-      const lectureId = String(bookmark.lectureId || "");
-      const siteId = bookmark.siteId ? String(bookmark.siteId) : "";
+      const lectureId = NT.sanitize.id(bookmark.lectureId);
+      if (!lectureId) return null;
+      const siteId = NT.sanitize.id(bookmark.siteId);
+      const bookmarkId = NT.sanitize.id(bookmark.id) || NT.util.uid("bm");
       let index = -1;
-      if (bookmark.id) index = this.db.bookmarks.findIndex((item) => item.id === bookmark.id);
+      if (bookmark.id) index = this.db.bookmarks.findIndex((item) => item.id === bookmarkId);
       if (index < 0 && siteId) {
         index = this.db.bookmarks.findIndex(
           (item) => String(item.siteId || "") === siteId && String(item.lectureId) === lectureId
@@ -434,8 +500,8 @@
       }
       const lecture = this.getLecture(lectureId) || {};
       const course = this.getCourse(bookmark.courseId || lecture.courseId) || {};
-      const next = {
-        id: bookmark.id || NT.util.uid("bm"),
+      const next = NT.sanitize.bookmark({
+        id: bookmarkId,
         lectureId,
         courseId: String(bookmark.courseId || lecture.courseId || ""),
         lectureTitle: bookmark.lectureTitle || lecture.title || "",
@@ -446,7 +512,8 @@
         remote: Boolean(bookmark.remote),
         createdAt: bookmark.createdAt || Date.now(),
         updatedAt: Date.now()
-      };
+      });
+      if (!next) return null;
       if (index >= 0) this.db.bookmarks[index] = { ...this.db.bookmarks[index], ...next };
       else this.db.bookmarks.push(next);
       this.emitChange("bookmark", next);
@@ -454,7 +521,9 @@
     },
 
     removeBookmark(id) {
-      const index = this.db.bookmarks.findIndex((item) => item.id === id);
+      const safeId = NT.sanitize.id(id);
+      if (!safeId) return null;
+      const index = this.db.bookmarks.findIndex((item) => item.id === safeId);
       if (index < 0) return null;
       const [removed] = this.db.bookmarks.splice(index, 1);
       this.emitChange("bookmark-removed", removed);
@@ -462,11 +531,12 @@
     },
 
     syncSiteBookmarks(lectureId, siteBookmarks, meta = {}) {
-      const id = String(lectureId);
+      const id = NT.sanitize.id(lectureId);
+      if (!id) return;
       const remoteItems = (siteBookmarks || []).map((item) => {
         const seconds = Number(item.at_seconds || item.seconds || item.time || 0);
         return {
-          siteId: String(item.id || item.bookmark_id || ""),
+          siteId: NT.sanitize.id(item.id || item.bookmark_id || ""),
           lectureId: id,
           courseId: String(meta.courseId || ""),
           lectureTitle: meta.lectureTitle || "",
@@ -500,7 +570,7 @@
       const progress = Object.values(this.db.progress);
       const done = progress.filter((item) => item.completed || item.manualDone).length;
       const inProgress = progress.filter(
-        (item) => !item.completed && (item.percent || 0) > 1
+        (item) => !item.completed && !item.manualUndone && (item.percent || 0) > 1
       ).length;
       const watchTotal = this.getWatchTotal();
       return {

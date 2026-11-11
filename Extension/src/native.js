@@ -638,9 +638,7 @@
     const title = course?.title || NT.util.slugToTitle(route.slug) || "This course";
     const courseId = route.courseId;
     const activeIds = Array.isArray(sync.activeCourseIds) ? sync.activeCourseIds : [];
-    const syncing =
-      activeIds.includes(courseId) ||
-      Boolean(sync.syncing && sync.currentCourseId === courseId);
+    const syncing = activeIds.includes(courseId);
 
     const data = {
       id: courseId,
@@ -952,6 +950,13 @@
     if (mounted) return;
     if (!onSite()) return;
     mounted = true;
+
+    // Auto-sync used to run only once at mount. Client-side navigation can
+    // move from home to My Course without a reload, so re-check on every route.
+    document.addEventListener("nt:route-change", () => {
+      clearTimeout(autoSyncTimer);
+      autoSyncTimer = setTimeout(maybeAutoSync, AUTO_SYNC_AFTER);
+    });
 
     store.on((event, payload) => {
       if (event === "settings") {

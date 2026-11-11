@@ -11,7 +11,9 @@
   // AARAMBH batch needed 221 requests for one tab), which is why only part of
   // the lecture list ever reached search. Keep a generous safety ceiling.
   const MAX_REQUESTS = 2000;
-  const MAX_PAGES = 100;
+  // Pagination is bounded by the request budget, not by a low page cap that
+  // could silently truncate a very long folder while still looking complete.
+  const MAX_PAGES = MAX_REQUESTS;
   const INDEX_VERSION = Number(NT.INDEX_VERSION) || 1;
   const PAGE_SIZE = 10;
   const COURSE_TTL = 6 * 60 * 60 * 1000;
@@ -88,6 +90,13 @@
     const duration = Number(
       details.duration || details.video_duration || details.file_duration || existingLecture?.duration || 0
     );
+    // The API can send "0"/"1" strings. Boolean("0") is true, which used to
+    // mark every lecture complete as soon as its details were read.
+    const siteFlag = details.is_heartbeat_complete;
+    const siteDone =
+      siteFlag === undefined || siteFlag === null
+        ? Boolean(existingLecture?.siteDone)
+        : NT.sanitize.bool(siteFlag);
 
     const lecture = store.upsertLecture({
       ...(existingLecture || {}),
@@ -108,24 +117,57 @@
       description: String(details.description || existingLecture?.description || "")
         .replace(/<[^>]+>/g, " ")
         .slice(0, 600),
-      siteDone: Boolean(
-        details.is_heartbeat_complete ?? existingLecture?.siteDone ?? false
-      ),
+      siteDone,
       detailsAt: Date.now()
     });
 
     const progress = store.getProgress(contentId);
-    const siteDone = Boolean(lecture.siteDone);
-    if (siteDone && !progress?.completed) {
+    if (siteDone && !progress?.completed && !progress?.manualUndone) {
       store.setProgress(contentId, {
         completed: true,
         siteCompleted: true,
         completedAt: Date.now(),
         duration: duration || progress?.duration || 0,
         lastWatchedAt: progress?.lastWatchedAt || Date.now()
+      }, { silent: true });
+    } else if (!siteDone && progress?.siteCompleted && !progress?.manualDone && !progress?.manualUndone) {
+      store.setProgress(contentId, { completed: false, siteCompleted: false, completedAt: 0 }, {
+        silent: true
       });
-    } else if (!siteDone && progress?.siteCompleted && !progress?.manualDone) {
-      store.setProgress(contentId, { completed: false, siteCompleted: false, completedAt: 0 });
+    }
+
+    // The site's own heartbeat stores a last position. Use it only when this
+    // device has no meaningful local position yet, and only once per lecture,
+    // so starting over locally is never undone by a later details refresh.
+    const localPosition = Number(progress?.position) || 0;
+    const sitePosition = Number(details.last_watched_seconds);
+    if (
+      store.settings.saveProgress &&
+      !siteDone &&
+      !progress?.completed &&
+      !progress?.manualDone &&
+      !progress?.manualUndone &&
+      !progress?.siteSeedChecked &&
+      localPosition < 15 &&
+      Number.isFinite(sitePosition) &&
+      sitePosition >= 15 &&
+      duration > 30 &&
+      sitePosition < duration - 25 &&
+      sitePosition > localPosition + 5
+    ) {
+      store.setProgress(
+        contentId,
+        {
+          position: sitePosition,
+          duration,
+          siteSeeded: true,
+          siteSeedChecked: true,
+          lastWatchedAt: progress?.lastWatchedAt || Date.now()
+        },
+        { silent: true }
+      );
+    } else if (!progress?.siteSeedChecked) {
+      store.setProgress(contentId, { siteSeedChecked: true }, { silent: true });
     }
 
     if (store.settings.syncBookmarks && Array.isArray(details.video_time_bookmarks)) {
@@ -186,15 +228,23 @@
         }
         return;
       }
-      order += 1;
       const lecture = api.normaliseLecture(item, {
         courseId: course.id,
         courseTitle: course.title,
         folderTitle: context.folderTitle || "",
-        order,
+        order: 0,
         thumbnail: course.thumbnail
       });
       if (!lecture || !lecture.playable) return;
+      const existing = store.getLecture(lecture.id);
+      if (context.preserveOrder && existing && Number(existing.order) > 0) {
+        // Passive page reads only contain one tab/folder. Keep the ordering
+        // produced by the complete crawl instead of resetting it to 1..n.
+        lecture.order = Number(existing.order);
+      } else {
+        order += 1;
+        lecture.order = order;
+      }
       store.upsertLecture(lecture);
       lectures.push(lecture);
     });
@@ -221,7 +271,10 @@
         });
       } catch (error) {
         if (error instanceof api.AuthError) throw error;
-        // Tabs that are not part of this course commonly 404. Move on quietly.
+        // Tabs that are not part of this course commonly 404. Move on
+        // quietly, but remember genuine network/server failures so a course
+        // with zero lectures does not look like a successful empty index.
+        if (Number(error?.status) !== 404) bucket.errors.push(error);
         if (page === 1) return;
         break;
       }
@@ -329,7 +382,7 @@
         }
 
         const { tabs, candidates } = candidateTabs(details);
-        const bucket = { requests: 0, order: 0, lectures: [], folders: new Map() };
+        const bucket = { requests: 0, order: 0, lectures: [], folders: new Map(), errors: [] };
         let lastError = detailError;
 
         for (const tab of candidates) {
@@ -362,15 +415,41 @@
           }
         }
 
-        const previousIds = store.getCourse(id)?.lectureIds || [];
+        // The same lecture can appear in more than one tab. Keep the first
+        // occurrence so counts and merged ids reflect real lectures.
+        bucket.lectures = [...new Map(bucket.lectures.map((lecture) => [lecture.id, lecture])).values()];
+
+        const previousCourse = store.getCourse(id);
+        const previousIds = previousCourse?.lectureIds || [];
         const freshIds = new Set(bucket.lectures.map((lecture) => String(lecture.id)));
         const mergedIds = [
           ...bucket.lectures.map((lecture) => String(lecture.id)),
           ...previousIds.filter((lectureId) => !freshIds.has(String(lectureId)))
         ];
 
+        const hitLimit = bucket.requests >= MAX_REQUESTS;
+        const crawlError = lastError || bucket.errors[0] || null;
         const errorMessage =
-          lastError && !bucket.lectures.length ? lastError.message || "No content found" : "";
+          !bucket.lectures.length && crawlError
+            ? crawlError.message || "No content found"
+            : "";
+        // A crawl that read some sections but failed on others is still
+        // incomplete: otherwise one flaky chapter would be remembered as a
+        // successful 673-lecture index and never retried. 404 tab probes are
+        // expected and are filtered out before they reach `bucket.errors`.
+        const partialError =
+          bucket.lectures.length && crawlError
+            ? `Some content could not be read (${crawlError.message || "request failed"}). Sync again to finish.`
+            : "";
+        const incompleteReason = cancelled()
+          ? "Sync cancelled."
+          : hitLimit
+            ? "Stopped at the request safety limit; sync again to continue."
+            : errorMessage || partialError;
+        // Only advance the index version after a complete crawl. Any non-404
+        // error, with or without lectures, keeps the course eligible for retry.
+        const complete = !cancelled() && !hitLimit && !crawlError;
+        const previousVersion = Number(previousCourse?.indexVersion) || 0;
 
         store.upsertCourse({
           ...course,
@@ -378,14 +457,10 @@
           lectureIds: Array.from(new Set(mergedIds)),
           syncedAt: Date.now(),
           lectureCount: mergedIds.length,
-          // A cancelled or budget-truncated crawl must keep retrying.
-          indexVersion:
-            cancelled() || bucket.requests >= MAX_REQUESTS
-              ? Number(course.indexVersion) || 0
-              : INDEX_VERSION,
-          syncError: errorMessage
+          indexVersion: complete ? INDEX_VERSION : Math.min(previousVersion, INDEX_VERSION - 1),
+          syncError: incompleteReason
         });
-        store.db.meta.lastSync = Date.now();
+        if (complete) store.db.meta.lastSync = Date.now();
         store.save();
 
         if (ownsState) {
@@ -395,21 +470,23 @@
             stage: "",
             current: 1,
             total: 1,
-            lastSync: Date.now(),
-            lastError: errorMessage
+            lastSync: complete ? Date.now() : state.lastSync,
+            lastError: incompleteReason
           });
         }
         emit("course", {
           courseId: id,
           lectures: bucket.lectures.length,
           requests: bucket.requests,
+          complete,
           ms: Date.now() - started
         });
         return {
           courseId: id,
           lectures: bucket.lectures.length,
           requests: bucket.requests,
-          error: errorMessage
+          complete,
+          error: incompleteReason
         };
       } catch (error) {
         if (ownsState) {
@@ -470,6 +547,12 @@
             internal: true
           });
           lectures += result?.lectures || 0;
+          if (result && result.complete === false) {
+            errors.push({
+              courseId: course.id,
+              message: result.error || "Course index is incomplete"
+            });
+          }
         } catch (error) {
           if (error instanceof api.AuthError) throw error;
           errors.push({ courseId: course.id, message: error?.message || "Index failed" });
@@ -657,7 +740,10 @@
         };
       const indexed = indexItems(course, items, {
         folderTitle: "",
-        order: 0
+        order: store
+          .getCourseLectures(courseId)
+          .reduce((max, lecture) => Math.max(max, Number(lecture.order) || 0), 0),
+        preserveOrder: true
       });
       if (indexed.lectures.length) {
         const previousIds = store.getCourse(courseId)?.lectureIds || [];
@@ -718,6 +804,7 @@
 
   window.addEventListener("message", (event) => {
     if (event.source !== window) return;
+    if (event.origin && event.origin !== location.origin) return;
     const msg = event.data;
     if (!msg || msg.source !== "nt-page" || msg.kind !== "api") return;
     ingestApi(msg);

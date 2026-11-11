@@ -16,6 +16,12 @@ const activeTab = async () => {
   return tabs[0] || null;
 };
 
+const isExtensionSender = (sender) =>
+  !sender?.id || sender.id === chrome.runtime.id;
+const isSiteSender = (sender) =>
+  isExtensionSender(sender) &&
+  /^https:\/\/([a-z0-9-]+\.)*nexttoppers\.com\//i.test(String(sender?.url || sender?.origin || ""));
+
 const sendToTab = async (tabId, payload) => {
   try {
     await chrome.tabs.sendMessage(tabId, payload, { frameId: 0 });
@@ -57,8 +63,13 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || typeof message !== "object") return false;
+  if (!isExtensionSender(sender)) return false;
 
   if (message.type === "nt:ensure-modules") {
+    if (!isSiteSender(sender)) {
+      sendResponse({ ok: false, error: "Modules can only be loaded on nexttoppers.com." });
+      return false;
+    }
     const tabId = sender.tab?.id;
     const files = Array.isArray(message.files)
       ? message.files.filter((file) => MODULES.has(file))

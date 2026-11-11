@@ -1371,15 +1371,17 @@
   const deleteBookmark = async (bookmarkId) => {
     const bookmark = store.getBookmark(bookmarkId);
     if (!bookmark) return;
-    const ok = await NT.ui.confirm({
-      title: "Delete this timestamp?",
-      message: bookmark.note
-        ? `“${bookmark.note}” at ${NT.util.formatTime(bookmark.seconds)} will be removed.`
-        : `The timestamp at ${NT.util.formatTime(bookmark.seconds)} will be removed.`,
-      confirmLabel: "Delete",
-      danger: true
-    });
-    if (!ok) return;
+    if (store.settings.confirmDelete) {
+      const ok = await NT.ui.confirm({
+        title: "Delete this timestamp?",
+        message: bookmark.note
+          ? `“${bookmark.note}” at ${NT.util.formatTime(bookmark.seconds)} will be removed.`
+          : `The timestamp at ${NT.util.formatTime(bookmark.seconds)} will be removed.`,
+        confirmLabel: "Delete",
+        danger: true
+      });
+      if (!ok) return;
+    }
     if (bookmark.siteId && store.settings.syncBookmarks && api.session.loggedIn()) {
       try {
         await api.deleteBookmark(bookmark.siteId);
@@ -1415,6 +1417,7 @@
       const file = input.files?.[0];
       if (!file) return;
       try {
+        if (file.size > 8 * 1024 * 1024) throw new Error("That backup is too large to import.");
         const text = await file.text();
         const payload = NT.util.safeJSON(text, null);
         if (!payload) throw new Error("That file is not valid JSON.");

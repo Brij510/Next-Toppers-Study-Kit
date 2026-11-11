@@ -238,6 +238,266 @@
     }
   };
 
+  /* ------------------------------------------------------------- sanitising */
+  // Stored data is user-editable (imports, extension pages) and API data is
+  // remote. Every value that reaches chrome.storage must be a bounded,
+  // known-type primitive, and object keys must never hit Object.prototype.
+  const BLOCKED_KEYS = new Set(["__proto__", "prototype", "constructor"]);
+  const MAX_TIMESTAMP = 8640000000000000;
+
+  const text = (value, max = 500, fallback = "") => {
+    if (value == null) return fallback;
+    const clean = String(value)
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+      .trim();
+    return clean ? clean.slice(0, max) : fallback;
+  };
+
+  const number = (value, fallback = 0, min = -Number.MAX_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.min(max, Math.max(min, n));
+  };
+
+  const bool = (value) => value === true || value === 1 || value === "1" || value === "true";
+
+  const id = (value) => {
+    const clean = text(value, 128);
+    return clean && !BLOCKED_KEYS.has(clean) ? clean : "";
+  };
+
+  const url = (value) => {
+    const clean = text(value, 2048);
+    if (!clean) return "";
+    try {
+      const base = typeof location !== "undefined" ? location.origin : undefined;
+      const parsed = new URL(clean, base);
+      return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : "";
+    } catch (_) {
+      return "";
+    }
+  };
+
+  const slug = (value) => {
+    const clean = text(value, 300)
+      .replace(/[^a-zA-Z0-9_-]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    return clean && clean !== ".." ? clean : "";
+  };
+
+  const mapValues = (raw, sanitizer) => {
+    const out = {};
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+    Object.keys(raw)
+      .slice(0, 20000)
+      .forEach((key) => {
+        const safeKey = id(key);
+        if (!safeKey) return;
+        const value = sanitizer(raw[key], safeKey);
+        if (value) out[safeKey] = value;
+      });
+    return out;
+  };
+
+  const settings = (raw) => {
+    const defaults = NT.DEFAULT_SETTINGS || {};
+    const source = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+    const out = {};
+    Object.keys(defaults).forEach((key) => {
+      const fallback = defaults[key];
+      const value = Object.prototype.hasOwnProperty.call(source, key) ? source[key] : fallback;
+      if (typeof fallback === "boolean") {
+        out[key] = bool(value);
+      } else if (typeof fallback === "number") {
+        const ranges = {
+          seekSeconds: [5, 30],
+          longSeekSeconds: [30, 90],
+          autoCompleteAt: [70, 99]
+        };
+        const [min, max] = ranges[key] || [0, Number.MAX_SAFE_INTEGER];
+        out[key] = Math.round(number(value, fallback, min, max));
+      } else if (key === "lastSeenVersion") {
+        out[key] = value == null || value === "" ? null : text(value, 32);
+      } else {
+        out[key] = value;
+      }
+    });
+    return out;
+  };
+
+  const lecture = (raw, idOverride) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    const lectureId = id(idOverride || raw.id);
+    if (!lectureId) return null;
+    return {
+      id: lectureId,
+      playId: id(raw.playId) || lectureId,
+      videoId: id(raw.videoId) || "",
+      courseId: id(raw.courseId) || "",
+      courseTitle: text(raw.courseTitle, 240),
+      title: text(raw.title, 300, "Untitled lecture"),
+      thumbnail: url(raw.thumbnail),
+      type: text(raw.type, 24, "file"),
+      fileType: Math.round(number(raw.fileType, 0, 0, 100)),
+      videoType: text(raw.videoType, 24),
+      isDrm: bool(raw.isDrm),
+      isFree: bool(raw.isFree),
+      isLive: bool(raw.isLive),
+      duration: number(raw.duration, 0, 0, 7 * 24 * 60 * 60),
+      playable: bool(raw.playable),
+      folderId: id(raw.folderId) || "",
+      folderTitle: text(raw.folderTitle, 240),
+      order: number(raw.order, 0, 0, 10000000),
+      description: text(raw.description, 700),
+      siteDone: bool(raw.siteDone),
+      detailsAt: number(raw.detailsAt, 0, 0, MAX_TIMESTAMP),
+      updatedAt: number(raw.updatedAt, 0, 0, MAX_TIMESTAMP)
+    };
+  };
+
+  const course = (raw, idOverride) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    const courseId = id(idOverride || raw.id);
+    if (!courseId) return null;
+    const lectureIds = Array.isArray(raw.lectureIds)
+      ? [...new Set(raw.lectureIds.map(id).filter(Boolean))].slice(0, 20000)
+      : [];
+    const path = text(raw.path, 400);
+    return {
+      id: courseId,
+      courseId,
+      title: text(raw.title, 240, "Untitled course"),
+      slug: slug(raw.slug),
+      thumbnail: url(raw.thumbnail),
+      description: text(raw.description, 700),
+      educator: text(raw.educator, 200),
+      itemType: text(raw.itemType, 40),
+      courseType: text(raw.courseType, 40),
+      isPurchased: bool(raw.isPurchased),
+      purchasedAt: number(raw.purchasedAt, 0, 0, MAX_TIMESTAMP),
+      validity: text(raw.validity, 80),
+      parentId: id(raw.parentId) || "",
+      path: /^\/(?!\/)/.test(path) ? path : "",
+      lectureIds,
+      lectureCount: Math.round(number(raw.lectureCount, lectureIds.length, 0, 50000)),
+      syncedAt: number(raw.syncedAt, 0, 0, MAX_TIMESTAMP),
+      updatedAt: number(raw.updatedAt, 0, 0, MAX_TIMESTAMP),
+      indexVersion: Math.round(number(raw.indexVersion, 0, 0, 1000)),
+      syncError: text(raw.syncError, 500)
+    };
+  };
+
+  const progress = (raw, idOverride) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    const contentId = id(idOverride || raw.contentId);
+    if (!contentId) return null;
+    const duration = number(raw.duration, 0, 0, 7 * 24 * 60 * 60);
+    const position = number(raw.position, 0, 0, 7 * 24 * 60 * 60);
+    const manualDone = bool(raw.manualDone);
+    const manualUndone = !manualDone && bool(raw.manualUndone);
+    const completed = manualDone || (!manualUndone && bool(raw.completed));
+    return {
+      contentId,
+      position,
+      duration,
+      percent:
+        duration > 0
+          ? Math.min(100, Math.max(0, (position / duration) * 100))
+          : number(raw.percent, 0, 0, 100),
+      completed,
+      manualDone,
+      manualUndone,
+      siteCompleted: bool(raw.siteCompleted),
+      siteSeeded: bool(raw.siteSeeded),
+      siteSeedChecked: bool(raw.siteSeedChecked),
+      watchTime: number(raw.watchTime, 0, 0, 1000000000),
+      lectureTitle: text(raw.lectureTitle, 300),
+      courseId: id(raw.courseId) || "",
+      createdAt: number(raw.createdAt, 0, 0, MAX_TIMESTAMP),
+      updatedAt: number(raw.updatedAt, 0, 0, MAX_TIMESTAMP),
+      lastWatchedAt: number(raw.lastWatchedAt, 0, 0, MAX_TIMESTAMP),
+      completedAt: completed ? number(raw.completedAt, 0, 0, MAX_TIMESTAMP) : 0
+    };
+  };
+
+  const bookmark = (raw, idOverride) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    const bookmarkId = id(idOverride || raw.id);
+    const lectureId = id(raw.lectureId);
+    if (!bookmarkId || !lectureId) return null;
+    return {
+      id: bookmarkId,
+      lectureId,
+      courseId: id(raw.courseId) || "",
+      lectureTitle: text(raw.lectureTitle, 300),
+      courseTitle: text(raw.courseTitle, 240),
+      seconds: number(raw.seconds, 0, 0, 10000000),
+      note: text(raw.note, 500),
+      siteId: id(raw.siteId) || "",
+      remote: bool(raw.remote),
+      createdAt: number(raw.createdAt, 0, 0, MAX_TIMESTAMP),
+      updatedAt: number(raw.updatedAt, 0, 0, MAX_TIMESTAMP)
+    };
+  };
+
+  const activity = (raw) => {
+    const out = {};
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+    Object.keys(raw)
+      .filter((key) => /^\d{4}-\d{2}-\d{2}$/.test(key))
+      .slice(0, 10000)
+      .forEach((key) => {
+        out[key] = number(raw[key], 0, 0, 172800);
+      });
+    return out;
+  };
+
+  const meta = (raw) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+    return {
+      schema: Math.round(number(raw.schema, 1, 1, 100)),
+      lastSync: number(raw.lastSync, 0, 0, MAX_TIMESTAMP),
+      totalWatchTime: number(raw.totalWatchTime, 0, 0, 1000000000),
+      created: number(raw.created, 0, 0, MAX_TIMESTAMP),
+      lastLectureId: id(raw.lastLectureId) || null
+    };
+  };
+
+  const db = (raw) => {
+    const source = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+    return {
+      _rev: text(source._rev, 128),
+      _savedAt: number(source._savedAt, 0, 0, MAX_TIMESTAMP),
+      settings: settings(source.settings),
+      lectures: mapValues(source.lectures, lecture),
+      courses: mapValues(source.courses, course),
+      progress: mapValues(source.progress, progress),
+      bookmarks: Array.isArray(source.bookmarks)
+        ? source.bookmarks.map((item) => bookmark(item)).filter(Boolean).slice(0, 20000)
+        : [],
+      activity: activity(source.activity),
+      meta: meta(source.meta)
+    };
+  };
+
+  NT.sanitize = {
+    id,
+    text,
+    number,
+    bool,
+    url,
+    settings,
+    lecture,
+    course,
+    progress,
+    bookmark,
+    activity,
+    meta,
+    map: mapValues,
+    db
+  };
+
   NT.routes = {
     parseCourse(pathname = location.pathname) {
       const match = String(pathname).match(

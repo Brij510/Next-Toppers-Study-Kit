@@ -134,7 +134,13 @@
     if (route) {
       const loaded = await loadPlayer();
       const current = NT.routes.parsePlay();
-      if (loaded && current?.contentId === route.contentId) {
+      const alreadyActive =
+        NT.player?.route?.contentId === route.contentId &&
+        NT.player?.route?.courseId === route.courseId;
+      // history.replaceState (used to clean ?nt_t after a deep link) fires the
+      // same route event. Re-initialising an already-active player would wipe
+      // the pending deep link and restart the resume decision.
+      if (!alreadyActive && loaded && current?.contentId === route.contentId) {
         NT.player.init({ syncDelay: 2600 });
       }
     } else {
@@ -241,6 +247,10 @@
 
   const handleMessage = (message, sender, sendResponse) => {
     if (!message || typeof message !== "object") return false;
+    // Only this extension (content scripts, popup, options) may drive the
+    // page. A web page cannot reach chrome.runtime without externally
+    // connectable, but reject spoofed senders defensively as well.
+    if (sender?.id && sender.id !== chrome.runtime.id) return false;
     const type = String(message.type || message.command || "");
 
     if (type === "open-hub" || type === "nt:open-hub") {
@@ -282,12 +292,31 @@
     }
 
     if (type === "continue") {
-      const progress = store.getContinueItem();
-      const lecture = progress ? store.getLecture(progress.contentId) : null;
-      if (lecture) {
-        NT.ui.routeTo(
-          NT.routes.playURL(lecture.playId || lecture.id, lecture.courseId, progress.position)
-        );
+      const wantedId = NT.sanitize.id(message.contentId || message.lectureId);
+      const progress = wantedId ? store.getProgress(wantedId) : store.getContinueItem();
+      const lecture = wantedId
+        ? store.getLecture(wantedId)
+        : progress
+          ? store.getLecture(progress.contentId)
+          : null;
+      const courseId =
+        NT.sanitize.id(message.courseId) ||
+        lecture?.courseId ||
+        progress?.courseId ||
+        "";
+      const playId =
+        NT.sanitize.id(message.playId) ||
+        lecture?.playId ||
+        lecture?.id ||
+        wantedId ||
+        "";
+      const requested = Number(message.seconds);
+      const position =
+        Number.isFinite(requested) && requested >= 0
+          ? requested
+          : Number(progress?.position) || 0;
+      if (playId && courseId) {
+        NT.ui.routeTo(NT.routes.playURL(playId, courseId, position));
         sendResponse?.({ ok: true });
       } else {
         sendResponse?.({ ok: false, reason: "No lecture in progress." });

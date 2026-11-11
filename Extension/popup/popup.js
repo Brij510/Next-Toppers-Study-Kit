@@ -36,8 +36,23 @@
   const getDb = () =>
     new Promise((resolve) => {
       chrome.storage.local.get(STORAGE_KEY, (result) => {
-        const db = result?.[STORAGE_KEY];
-        resolve(db && typeof db === "object" ? db : { settings: { ...DEFAULTS }, lectures: {}, progress: {}, bookmarks: [] });
+        const stored = result?.[STORAGE_KEY];
+        const base = {
+          settings: { ...DEFAULTS },
+          lectures: {},
+          courses: {},
+          progress: {},
+          bookmarks: [],
+          activity: {},
+          meta: {}
+        };
+        if (!stored || typeof stored !== "object") return resolve(base);
+        const clean = NT.sanitize ? NT.sanitize.db(stored) : stored;
+        resolve({
+          ...base,
+          ...clean,
+          settings: { ...DEFAULTS, ...(clean.settings || {}) }
+        });
       });
     });
 
@@ -76,6 +91,7 @@
           item.lastWatchedAt &&
           !item.completed &&
           !item.manualDone &&
+          !item.manualUndone &&
           (Number(item.percent) || 0) > 1 &&
           (Number(item.duration) || 0) > 0
       )
@@ -97,7 +113,11 @@
     const progressItems = Object.values(db.progress || {});
     const done = progressItems.filter((item) => item.completed || item.manualDone).length;
     const inProgress = progressItems.filter(
-      (item) => !item.completed && !item.manualDone && (Number(item.percent) || 0) > 1
+      (item) =>
+        !item.completed &&
+        !item.manualDone &&
+        !item.manualUndone &&
+        (Number(item.percent) || 0) > 1
     ).length;
     const bookmarks = Array.isArray(db.bookmarks) ? db.bookmarks : [];
 
@@ -184,17 +204,24 @@
   const resume = async (card) => {
     const active = await activeTab();
     const seconds = Number(card.dataset.seconds) || 0;
-    const contentId = card.dataset.playId;
+    const contentId = card.dataset.lecture || card.dataset.playId;
+    const playId = card.dataset.playId || contentId;
     const courseId = card.dataset.course;
     if (isSite(active)) {
-      const response = await sendTab(active.id, { type: "continue" });
+      const response = await sendTab(active.id, {
+        type: "continue",
+        contentId,
+        playId,
+        courseId,
+        seconds
+      });
       if (response?.ok) {
         window.close();
         return;
       }
     }
-    if (!contentId || !courseId) return;
-    const url = `https://nexttoppers.com/play/${encodeURIComponent(contentId)}-${encodeURIComponent(
+    if (!playId || !courseId) return;
+    const url = `https://nexttoppers.com/play/${encodeURIComponent(playId)}-${encodeURIComponent(
       courseId
     )}${seconds > 0 ? `?nt_t=${Math.floor(seconds)}` : ""}`;
     chrome.tabs.create({ url });
@@ -210,7 +237,9 @@
       if (response?.ok) return;
     }
     const db = await getDb();
-    db.settings = { ...DEFAULTS, ...(db.settings || {}), [key]: value };
+    db.settings = NT.sanitize
+      ? NT.sanitize.settings({ ...(db.settings || {}), [key]: value })
+      : { ...DEFAULTS, ...(db.settings || {}), [key]: value };
     await chrome.storage.local.set({ [STORAGE_KEY]: db });
   };
 

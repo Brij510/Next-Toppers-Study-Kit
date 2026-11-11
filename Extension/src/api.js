@@ -225,12 +225,14 @@
       .slice(0, 70);
 
   const absolute = (value) => {
-    if (!value) return "";
+    const raw = String(value || "").trim();
+    if (!raw) return "";
     try {
-      if (/^https?:\/\//i.test(value)) return value;
-      return new URL(value, location.origin).href;
+      const parsed = new URL(raw, location.origin);
+      // Only ordinary web images; never javascript:, data:, blob:, etc.
+      return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : "";
     } catch (_) {
-      return value;
+      return "";
     }
   };
 
@@ -532,18 +534,6 @@
       body: { bookmark_id: String(bookmarkId) }
     });
 
-  const heartbeat = async ({ contentId, courseId, positionSec, durationSec, trigger = "heartbeat" }) =>
-    request(`${API}/v1/watch/vod/heartbeat`, {
-      method: "POST",
-      body: {
-        contentId: String(contentId),
-        courseId: String(courseId),
-        positionSec: Math.max(0, Math.floor(Number(positionSec) || 0)),
-        durationSec: Math.max(0, Math.floor(Number(durationSec) || 0)),
-        trigger
-      }
-    });
-
   const courseFromDetails = (courseId, details, fallback = {}) => {
     const root = details?.data ?? details;
     let found = null;
@@ -584,7 +574,6 @@
     getContentDetails,
     addBookmark,
     deleteBookmark,
-    heartbeat,
     normaliseCourse,
     normaliseLecture,
     normaliseTabs,
